@@ -1,7 +1,5 @@
 #pragma once
 #include <Eigen/Dense>
-#include <functional>
-#include <nlopt.hpp>
 #include <string>
 #include <map>
 #include <vector>

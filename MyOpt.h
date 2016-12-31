@@ -1,34 +1,28 @@
 #pragma once
 #include <Eigen/Dense>
-#include <string>
 #include <map>
+#include <string>
 #include <vector>
 typedef std::function<double(const std::vector<double>& input, std::vector<double>& grad, void* data)> ObjFunc;
 class Solver;
 struct StopCond
 {
-    double _stop_val;
+    double _stop_val;  // when the fom is below _stop_val, stop optimization
     double _xtol_rel;
     double _ftol_rel;
     size_t _history;  // history to remember, for delta based stop condition (xtol and ftol)
     size_t _max_eval;
     size_t _max_iter;
-    size_t _dim;
 };
 class MyOpt
 {
-    StopCond _cond;
-    ObjFunc _func;
-    void* _data;
-    Solver* _solver;
-
 public:
     enum Algorithm
     {
         CG = 0,
         BFGS,
         RProp,
-        DERandomF,
+        MBFGS, // Google: superlinear nonconvex for papers
         NUM_ALGORITHMS  // number of algorithm
     };
     enum Result
@@ -59,43 +53,61 @@ public:
     void set_min_objective(ObjFunc, void* data);
     std::string get_algorithm_name() const noexcept;
     size_t get_dimension() const noexcept;
+
+private:
+    StopCond _cond;
+    ObjFunc _func;
+    void* _data;
+    Solver* _solver;
+    size_t _dim;
+    void _default_stop_cond();
 };
 
 // Abstract class for solver
 class Solver
 {
-    StopCond _cond;
-    ObjFunc  _func;
-    void*    _data;
-    std::map<std::string, double> _params;
-    virtual void _init() =0;
-
 public:
     Solver(ObjFunc, StopCond, void* data);
     void set_param(const std::map<std::string, double>& param);
-    virtual MyOpt::Result minimize() = 0;
+    virtual MyOpt::Result minimize();
+
+protected:
+    StopCond _cond;
+    ObjFunc _func;
+    void* _data;
+    size_t _dim;
+    Eigen::MatrixXd _history_x;
+    Eigen::VectorXd _history_y;
+    std::map<std::string, double> _params;
+
+    virtual void _init() = 0;
+    virtual MyOpt::Result _one_iter() = 0;
+    virtual bool _to_stop();
 };
 
 class CG : public Solver
 {
-    double c1, c2; // param to control line search
+    double c1, c2;  // param to control line search
+    void _init();
+    MyOpt::Result _one_iter();
 public:
     using Solver::Solver;
-    MyOpt::Result minimize();
 };
 
 class BFGS : public Solver
 {
-    double c1, c2; // param to control line search
+    double c1, c2;  // param to control line search
+    void _init();
+    MyOpt::Result _one_iter();
 public:
     using Solver::Solver;
-    MyOpt::Result minimize();
 };
 
 class RProp : public Solver
 {
     // Some params, need further reading
+    void _init();
+    MyOpt::Result _one_iter();
 public:
     using Solver::Solver;
-    MyOpt::Result minimize();
 };

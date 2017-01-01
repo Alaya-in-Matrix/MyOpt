@@ -8,23 +8,33 @@
 
 using namespace std;
 using namespace Eigen;
-
-double tb_square(const vector<double>& v, vector<double>& grad, void*)
+std::uniform_real_distribution<double> distr(-100, 100);
+double tb_square(const VectorXd& v, VectorXd& grad, bool need_g, void*)
 {
-    double x = v[0];
-    if(! grad.empty())
-        grad[0] = 2 * x;
-    return pow(x, 2);
+    static double x0 = distr(engine);
+    static double y0 = distr(engine);
+    double x  = v[0];
+    double y  = v[1];
+    if(need_g)
+    {
+        grad[0] = 2 * (x - x0);
+        grad[1] = 2 * (y - y0);
+    }
+    return pow(x - x0, 2) + pow(y - y0, 2);
 }
 
 int main()
 {
     printf("SEED is %zu\n", rand_seed);
-    MyOpt opt(MyOpt::BFGS, 1);
+    MyOpt opt(MyOpt::BFGS, 2);
     opt.set_min_objective(tb_square, nullptr);
-    vector<double> x{34};
+    cout << "Algorithm: " << opt.get_algorithm_name() << endl;
+    cout << "Dimension: " << opt.get_dimension() << endl;
+    VectorXd x(opt.get_dimension());
+    x << distr(engine), distr(engine);
     double y(std::numeric_limits<double>::infinity());
-    opt.optimize(x, y);
-    printf("Best x = %g, y = %g\n", x[0], y);
+    auto result = opt.optimize(x, y);
+    printf("Best x = (%g, %g), y = %g\n", x[0], x[1], y);
+    cout << "result is " << result << endl;
     return EXIT_SUCCESS;
 }

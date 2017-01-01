@@ -3,16 +3,17 @@
 #include <map>
 #include <string>
 #include <vector>
-typedef std::function<double(const std::vector<double>& input, std::vector<double>& grad, void* data)> ObjFunc;
+#include <queue>
+typedef std::function<double(const Eigen::VectorXd& input, Eigen::VectorXd& grad, bool need_g, void* data)> ObjFunc;
 class Solver;
 struct StopCond
 {
-    double _stop_val;  // when the fom is below _stop_val, stop optimization
-    double _xtol_rel;
-    double _ftol_rel;
-    size_t _history;  // history to remember, for delta based stop condition (xtol and ftol)
-    size_t _max_eval;
-    size_t _max_iter;
+    double stop_val;  // when the fom is below _stop_val, stop optimization
+    double xtol_rel;
+    double ftol_rel;
+    size_t history;  // history to remember, for delta based stop condition (xtol and ftol)
+    size_t max_iter;
+    size_t max_eval;
 };
 class MyOpt
 {
@@ -22,8 +23,8 @@ public:
         CG = 0,
         BFGS,
         RProp,
-        MBFGS, // Google: superlinear nonconvex for papers
-        NUM_ALGORITHMS  // number of algorithm
+        // MBFGS, // Google: superlinear nonconvex for papers
+        // NUM_ALGORITHMS  // number of algorithm
     };
     enum Result
     {  // copied from
@@ -31,58 +32,75 @@ public:
         INVALID_ARGS = -2,
         INVALID_INITIAL = -3,  // starting point is NAN|INF
         NANINF = -4,           // for those algorithms that can't recover from inf|nan
-        SUCCESS = 1,
-        STOPVAL_REACHED = 2,
-        FTOL_REACHED = 3,
-        XTOL_REACHED = 4,
-        MAXEVAL_REACHED = 5,
-        MAXTIME_REACHED = 6
+        SUCCESS = 0, 
+        STOPVAL_REACHED,
+        FTOL_REACHED,
+        XTOL_REACHED,
+        MAXEVAL_REACHED,
+        MAXITER_REACHED 
     };
     MyOpt(Algorithm, size_t);
-    Result optimize(std::vector<double>& x0, double& y);
+    Result optimize(Eigen::VectorXd& x0, double& y);
     ~MyOpt();
 
     std::string opt_message(const Result);
     void set_stop_val(double);
     void set_algo_param(const std::map<std::string, double>&);
     void set_xtol_rel(double);
-    void set_history(double);
+    void set_history(size_t);
     void set_ftol_rel(double);
-    void set_max_eval(double);
-    void set_max_iter(double);  // max line search
+    void set_max_eval(size_t);
+    void set_max_iter(size_t);  // max line search
     void set_min_objective(ObjFunc, void* data);
     std::string get_algorithm_name() const noexcept;
     size_t get_dimension() const noexcept;
 
 private:
-    StopCond _cond;
-    ObjFunc _func;
-    void* _data;
-    Solver* _solver;
-    size_t _dim;
-    void _default_stop_cond();
+    const Algorithm _algo;
+    const size_t    _dim;
+
+    StopCond  _cond;
+    void*     _data;
+    Solver*   _solver;
+    ObjFunc   _func;
+    std::map<std::string, double> _params;
+    StopCond  _default_stop_cond();
 };
 
 // Abstract class for solver
 class Solver
 {
 public:
-    Solver(ObjFunc, StopCond, void* data);
-    void set_param(const std::map<std::string, double>& param);
-    virtual MyOpt::Result minimize();
+    Solver(ObjFunc, size_t, StopCond, void* data);
+    virtual void set_param(const std::map<std::string, double>& param);
+    virtual ~Solver();
+    virtual MyOpt::Result minimize(Eigen::VectorXd& x0, double& y);
 
 protected:
-    StopCond _cond;
-    ObjFunc _func;
-    void* _data;
-    size_t _dim;
-    Eigen::MatrixXd _history_x;
-    Eigen::VectorXd _history_y;
-    std::map<std::string, double> _params;
+    size_t _eval_counter;
+    size_t _iter_counter;
 
-    virtual void _init() = 0;
+    size_t          _dim;
+    StopCond        _cond;
+    void*           _data;
+    std::queue<Eigen::VectorXd> _history_x;
+    std::queue<double>          _history_y;
+    MyOpt::Result   _result;
+
+    ObjFunc         _func;
+    std::map<std::string, double> _params;
+    Eigen::VectorXd _bestx;
+    double _besty;
+
+    // maintained by _one_iter
+    Eigen::VectorXd _current_x;
+    Eigen::VectorXd _current_g;
+    double _current_y;
+
+    virtual void _init(); // clear counter, best_x, best_y, set params
+    virtual bool _limit_reached(); // return SUCCESS if not to stop
+    virtual void _line_search_exact(const Eigen::VectorXd& direction, double& alpha, double& y, int max_search);
     virtual MyOpt::Result _one_iter() = 0;
-    virtual bool _to_stop();
 };
 
 class CG : public Solver

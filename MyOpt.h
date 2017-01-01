@@ -103,7 +103,8 @@ protected:
 
     virtual void _init(); // clear counter, best_x, best_y, set params
     virtual void _update_hist();
-    virtual void _line_search_exact(const Eigen::VectorXd& direction, double& alpha, double& y, int max_search);
+    virtual void _line_search_exact(const Eigen::VectorXd& direction, double& alpha, double& y, int max_search,
+                                    double trial);
     virtual bool _limit_reached(); // return SUCCESS if not to stop
     virtual MyOpt::Result _one_iter() = 0;
 };

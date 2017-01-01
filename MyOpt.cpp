@@ -52,7 +52,6 @@ MyOpt::Result MyOpt::optimize(VectorXd& x0, double& y)
             return INVALID_ARGS;
     }
     _solver->set_param(_params);
-    cout << "x0: " << x0.transpose() << endl;
     return _solver->minimize(x0, y);
 }
 MyOpt::~MyOpt()
@@ -189,7 +188,7 @@ bool Solver::_limit_reached()
     }
     return _result != MyOpt::SUCCESS;
 }
-void Solver::_line_search_exact(const VectorXd& direction, double& alpha, double& y, int max_search)
+void Solver::_line_search_exact(const VectorXd& direction, double& alpha, double& y, int max_search, double trial)
 {
     // exact line search use Golden search
     // Start from _current_x, _current_y
@@ -207,7 +206,7 @@ void Solver::_line_search_exact(const VectorXd& direction, double& alpha, double
     double line_g = 0;
     double a1 = 0;    // lower bound
     double a2 = INF;  // upper bound
-    alpha = 1.0 / log2(1.0 + _current_g.norm());
+    alpha = trial;
     y = line_func(alpha, line_g, false);
     if (y >= _current_y)
     {
@@ -271,7 +270,6 @@ void Solver::_line_search_exact(const VectorXd& direction, double& alpha, double
         alpha = a4;
         y     = y4;
     }
-    cout << "Alpha = " << alpha << ", y = " << y << endl;
     assert(y < _current_y);
 }
 void CG::_init() 
@@ -283,6 +281,12 @@ void CG::_init()
 MyOpt::Result CG::_one_iter() 
 {
     const size_t inner_iter = _iter_counter % _dim;
+    static double trial     = 1.0 / log2(1 + _current_g.norm());
+    cout << "Iter: " << _iter_counter << endl;
+    cout << "Eval: " << _eval_counter << endl;
+    cout << "Inner iter: " << inner_iter << endl;
+    cout << "Y = " << _current_y << endl;
+    cout << "G.norm = " << _current_g.norm() << endl;
     VectorXd direction(_dim);
     if(inner_iter == 0)
         direction = -1 * _current_g;
@@ -290,11 +294,13 @@ MyOpt::Result CG::_one_iter()
         direction = -1 * _current_g + _current_g.squaredNorm() / _former_g.squaredNorm() * _former_direction;
     double alpha = 0;
     double y     = 0;
-    _line_search_exact(direction, alpha, y, 40);
+    _line_search_exact(direction, alpha, y, 40, trial);
+    cout << "Alpha: " << alpha << endl;
     _former_g         = _current_g;
     _former_direction = direction;
     _current_x        = _current_x + alpha * direction;
     _current_y        = _func(_current_x, _current_g, true, _data);
+    cout << "=======================" << endl;
     return MyOpt::SUCCESS;
 }
 void BFGS::_init() { Solver::_init(); }

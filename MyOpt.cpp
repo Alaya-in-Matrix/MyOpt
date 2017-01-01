@@ -23,7 +23,8 @@ StopCond MyOpt::_default_stop_cond()
     sc.stop_val = -1 * INF;
     sc.xtol_rel = 1e-15;
     sc.ftol_rel = 1e-15;
-    sc.history = 2;
+    sc.gtol     = 1e-15;
+    sc.history  = 2;
     sc.max_iter = 100;
     sc.max_eval = 300;
     return sc;
@@ -60,8 +61,9 @@ MyOpt::~MyOpt()
 }
 void MyOpt::set_stop_val(double v) { _cond.stop_val = v; }
 void MyOpt::set_xtol_rel(double v) { _cond.xtol_rel = v; }
-void MyOpt::set_history(size_t h) { _cond.history = h + 1; }
 void MyOpt::set_ftol_rel(double v) { _cond.ftol_rel = v; }
+void MyOpt::set_gtol(double v)     { _cond.gtol     = v; }
+void MyOpt::set_history(size_t h)  { _cond.history  = h + 1; }
 void MyOpt::set_max_eval(size_t v) { _cond.max_eval = v; }
 void MyOpt::set_max_iter(size_t v) { _cond.max_iter = v; }
 void MyOpt::set_algo_param(const std::map<std::string, double>& p) { _params = p; }
@@ -97,21 +99,7 @@ Solver::Solver(ObjFunc f, size_t dim, StopCond sc, void* d)
             _bestx = x;
             _besty = val;
         }
-        assert(_history_x.size() == _history_y.size());
-        _history_x.push(x);
-        _history_y.push(_besty);
-        while (_history_x.size() > _cond.history)
-        {
-            _history_x.pop();
-            _history_y.pop();
-        }
         ++_eval_counter;
-#ifdef MYDEBUG
-        if(need_g)
-            cout << "Y = " << val << endl;
-        else
-            cout << "Y = " << val << ", grad.norm() = " << grad.norm() << endl;
-#endif
         return val;
     };
 }
@@ -138,19 +126,26 @@ MyOpt::Result Solver::minimize(VectorXd& x0, double& y)
     _current_g = VectorXd::Constant(_dim, 1, INF);
     _current_y = _func(_current_x, _current_g, true, _data);
 
-    double alpha = 0;
-    y            = INF;
-    VectorXd direction = -1 * _current_g;
-    _line_search_exact(direction, alpha, y, 20);
-    x0 = _current_x + alpha * direction;
-    // while (!_limit_reached())
-    // {
-    //     ++_iter_counter;
-    //     _one_iter();
-    // }
-    // x0 = _bestx;
-    // y  = _besty;
+    while (!_limit_reached())
+    {
+        _one_iter();
+        ++_iter_counter;
+        _update_hist();
+    }
+    x0 = _bestx;
+    y  = _besty;
     return _result;
+}
+void Solver::_update_hist()
+{
+    assert(_history_x.size() == _history_y.size());
+    _history_x.push(_current_x);
+    _history_y.push(_besty);
+    while (_history_x.size() > _cond.history)
+    {
+        _history_x.pop();
+        _history_y.pop();
+    }
 }
 void Solver::set_param(const map<string, double>& p) { _params = p; }
 bool Solver::_limit_reached()
@@ -165,6 +160,8 @@ bool Solver::_limit_reached()
         else if (_history_y.size() >= _cond.history &&
                  fabs(_history_y.front() - _history_y.back()) < _cond.ftol_rel * (1 + fabs(_history_y.front())))
             _result = MyOpt::FTOL_REACHED;
+        else if (_current_g.norm() < _cond.gtol)
+            _result = MyOpt::GTOL_REACHED;
         else if (_eval_counter > _cond.max_eval)
             _result = MyOpt::MAXEVAL_REACHED;
         else if (_iter_counter > _cond.max_iter)
@@ -214,8 +211,6 @@ void Solver::_line_search_exact(const VectorXd& direction, double& alpha, double
         a2 = alpha;
     }
     const int remain_search = max_search - (_eval_counter - init_eval);
-    cout << "Direction: " << direction.transpose() << endl;
-    printf("[a1, a2] = [%g, %g], remain_search = %d\n", a1, a2, remain_search);
 
     // Golden selection
     const double golden_rate = (sqrt(5) - 1) / 2.0;
@@ -256,10 +251,32 @@ void Solver::_line_search_exact(const VectorXd& direction, double& alpha, double
         alpha = a4;
         y     = y4;
     }
+    cout << "Alpha = " << alpha << ", y = " << y << endl;
     assert(y < _current_y);
 }
-void CG::_init() { TODO; }
-MyOpt::Result CG::_one_iter() { TODO; }
+void CG::_init() 
+{ 
+    Solver::_init(); 
+    _former_g         = VectorXd(_dim);
+    _former_direction = VectorXd(_dim);
+}
+MyOpt::Result CG::_one_iter() 
+{
+    const size_t inner_iter = _iter_counter % _dim;
+    VectorXd direction(_dim);
+    if(inner_iter == 0)
+        direction = -1 * _current_g;
+    else
+        direction = -1 * _current_g + _current_g.squaredNorm() / _former_g.squaredNorm() * _former_direction;
+    double alpha = 0;
+    double y     = 0;
+    _line_search_exact(direction, alpha, y, 40);
+    _former_g         = _current_g;
+    _former_direction = direction;
+    _current_x        = _current_x + alpha * direction;
+    _current_y        = _func(_current_x, _current_g, true, _data);
+    return MyOpt::SUCCESS;
+}
 void BFGS::_init() { Solver::_init(); }
 MyOpt::Result BFGS::_one_iter() { TODO; }
 void RProp::_init() { TODO; }

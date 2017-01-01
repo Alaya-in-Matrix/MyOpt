@@ -11,6 +11,7 @@ struct StopCond
     double stop_val;  // when the fom is below _stop_val, stop optimization
     double xtol_rel;
     double ftol_rel;
+    double gtol;
     size_t history;  // history to remember, for delta based stop condition (xtol and ftol)
     size_t max_iter;
     size_t max_eval;
@@ -36,6 +37,7 @@ public:
         STOPVAL_REACHED,
         FTOL_REACHED,
         XTOL_REACHED,
+        GTOL_REACHED,
         MAXEVAL_REACHED,
         MAXITER_REACHED 
     };
@@ -47,8 +49,9 @@ public:
     void set_stop_val(double);
     void set_algo_param(const std::map<std::string, double>&);
     void set_xtol_rel(double);
-    void set_history(size_t);
     void set_ftol_rel(double);
+    void set_gtol(double);
+    void set_history(size_t);
     void set_max_eval(size_t);
     void set_max_iter(size_t);  // max line search
     void set_min_objective(ObjFunc, void* data);
@@ -98,8 +101,9 @@ protected:
     double _current_y;
 
     virtual void _init(); // clear counter, best_x, best_y, set params
-    virtual bool _limit_reached(); // return SUCCESS if not to stop
+    virtual void _update_hist();
     virtual void _line_search_exact(const Eigen::VectorXd& direction, double& alpha, double& y, int max_search);
+    virtual bool _limit_reached(); // return SUCCESS if not to stop
     virtual MyOpt::Result _one_iter() = 0;
 };
 
@@ -107,6 +111,8 @@ class CG : public Solver
 {
     double c1, c2;  // param to control line search
     void _init();
+    Eigen::VectorXd _former_g;
+    Eigen::VectorXd _former_direction;
     MyOpt::Result _one_iter();
 public:
     using Solver::Solver;

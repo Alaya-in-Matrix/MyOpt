@@ -29,17 +29,17 @@ public:
     };
     enum Result
     {  // copied from
-        FAILURE = -1,
-        INVALID_ARGS = -2,
+        FAILURE         = -1,
+        INVALID_ARGS    = -2,
         INVALID_INITIAL = -3,  // starting point is NAN|INF
-        NANINF = -4,           // for those algorithms that can't recover from inf|nan
-        SUCCESS = 0, 
+        NANINF          = -4,           // for those algorithms that can't recover from inf|nan
+        SUCCESS         = 0,
         STOPVAL_REACHED,
         FTOL_REACHED,
         XTOL_REACHED,
         GTOL_REACHED,
         MAXEVAL_REACHED,
-        MAXITER_REACHED 
+        MAXITER_REACHED, 
     };
     MyOpt(Algorithm, size_t);
     Result optimize(Eigen::VectorXd& x0, double& y);
@@ -55,8 +55,9 @@ public:
     void set_max_eval(size_t);
     void set_max_iter(size_t);  // max line search
     void set_min_objective(ObjFunc, void* data);
-    std::string get_algorithm_name() const noexcept;
     size_t get_dimension() const noexcept;
+    std::string get_algorithm_name() const noexcept;
+    std::string explain_result(Result) const noexcept;
 
 private:
     const Algorithm _algo;

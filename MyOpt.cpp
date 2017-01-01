@@ -69,17 +69,37 @@ void MyOpt::set_max_iter(size_t v) { _cond.max_iter = v; }
 void MyOpt::set_algo_param(const std::map<std::string, double>& p) { _params = p; }
 std::string MyOpt::get_algorithm_name() const noexcept
 {
+#define C(A) case A: return #A
     switch (_algo)
     {
-        case CG:
-            return "Congugate Gradient";
-        case BFGS:
-            return "BFGS";
-        case RProp:
-            return "RProp";
+        C(CG);
+        C(BFGS);
+        C(RProp);
         default:
             return "Unsupported algorithm";
     }
+#undef C
+}
+std::string MyOpt::explain_result(Result r) const noexcept
+{
+#define C(A) case A: return #A
+    switch(r)
+    {
+        C(FAILURE         );
+        C(INVALID_ARGS    );
+        C(INVALID_INITIAL );
+        C(NANINF          );
+        C(SUCCESS         );
+        C(STOPVAL_REACHED);
+        C(FTOL_REACHED);
+        C(XTOL_REACHED);
+        C(GTOL_REACHED);
+        C(MAXEVAL_REACHED);
+        C(MAXITER_REACHED);
+        default:
+            return "Unknown reason" + to_string(r);
+    }
+#undef C
 }
 size_t MyOpt::get_dimension() const noexcept { return _dim; }
 Solver::Solver(ObjFunc f, size_t dim, StopCond sc, void* d)

@@ -41,6 +41,6 @@ int main()
     opt.set_ftol_rel(1e-3);
     auto result = opt.optimize(x, y);
     printf("Best x = (%g, %g), y = %g\n", x[0], x[1], y);
-    cout << "result is " << result << endl;
+    cout << "result is " << opt.explain_result(result) << endl;
     return EXIT_SUCCESS;
 }

@@ -14,12 +14,14 @@ else()
     include_directories(${EIGEN_INC_DIR})
 endif()
 
-set(SRC test.cpp
-        MyOpt.cpp
-        def.cpp)
+set(LIBSRC MyOpt.cpp def.cpp)
+set(EXESRC test.cpp)
 set(EXE testopt)
-add_executable(${EXE} ${SRC})
-set_property(TARGET ${EXE} PROPERTY CXX_STANDARD 11)
+set(LIB MyOpt)
+add_executable(${EXE} ${EXESRC})
+add_library(${LIB} ${LIBSRC})
+target_link_libraries(${EXE} ${LIB})
+set_property(TARGET ${EXE} ${LIB} PROPERTY CXX_STANDARD 11)
 
 # debug macro
 option(MYDEBUG "Debug macro for optimizer" OFF)
@@ -36,4 +38,19 @@ else()
     message(STATUS "Close debug marcro")
     remove_definitions(-DMYDEBUG)
     remove_definitions(-DDEBUG_RAND_SEED)
+endif()
+
+# install program, libs, headers and docs
+if(CMAKE_INSTALL_PREFIX)
+    message(STATUS "Cmake install prefix: ${CMAKE_INSTALL_PREFIX}")
+    install(TARGETS ${LIB} ${EXE}
+            RUNTIME DESTINATION bin
+            ARCHIVE DESTINATION lib
+            LIBRARY DESTINATION lib)
+    install(FILES MyOpt.h
+            DESTINATION inc
+            PERMISSIONS OWNER_READ GROUP_READ)
+    install(FILES README.md
+            DESTINATION doc
+            PERMISSIONS OWNER_READ GROUP_READ)
 endif()

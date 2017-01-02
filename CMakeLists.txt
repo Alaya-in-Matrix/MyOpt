@@ -42,7 +42,7 @@ endif()
 
 # install program, libs, headers and docs
 if(CMAKE_INSTALL_PREFIX)
-    message(STATUS "Cmake install prefix: ${CMAKE_INSTALL_PREFIX}")
+    message(STATUS "Cmake install prefix for MyOpt: ${CMAKE_INSTALL_PREFIX}")
     install(TARGETS ${LIB} ${EXE}
             RUNTIME DESTINATION bin
             ARCHIVE DESTINATION lib

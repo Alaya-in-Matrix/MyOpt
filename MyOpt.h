@@ -96,15 +96,15 @@ protected:
     Eigen::VectorXd _bestx;
     double _besty;
 
-    // maintained by _one_iter
+    // updated by _one_iter()
     Eigen::VectorXd _current_x;
     Eigen::VectorXd _current_g;
     double _current_y;
 
     virtual void _init(); // clear counter, best_x, best_y, set params
     virtual void _update_hist();
-    virtual void _line_search_exact(const Eigen::VectorXd& direction, double& alpha, double& y, int max_search,
-                                    double trial);
+    virtual void _line_search_inexact(const Eigen::VectorXd& direction, double& alpha, Eigen::VectorXd& x,
+                                      Eigen::VectorXd& g, double& y, size_t max_search, double trial);
     virtual bool _limit_reached(); // return SUCCESS if not to stop
     virtual MyOpt::Result _one_iter() = 0;
 };

@@ -144,6 +144,7 @@ MyOpt::Result Solver::minimize(VectorXd& x0, double& y)
     _current_x = x0;
     _current_g = VectorXd::Constant(_dim, 1, INF);
     _current_y = _func(_current_x, _current_g, true, _data);
+    printf("Initial y = %g, G.norm = %g\n\n", _current_y, _current_g.norm());
 
     while (!_limit_reached())
     {
@@ -188,89 +189,90 @@ bool Solver::_limit_reached()
     }
     return _result != MyOpt::SUCCESS;
 }
-void Solver::_line_search_exact(const VectorXd& direction, double& alpha, double& y, int max_search, double trial)
+void Solver::_line_search_inexact(const Eigen::VectorXd& direction, double& alpha, Eigen::VectorXd& x,
+                                  Eigen::VectorXd& g, double& y, size_t max_search, double trial)
 {
-    // exact line search use Golden search
-    // Start from _current_x, _current_y
-    // Assume _current_g is the gradient of _current_x
-    assert(_current_g.dot(direction) <= 0);
-    auto line_func = [&](const double a, double& g, bool need_g) -> double {
-        VectorXd x = _current_x + a * direction;
-        VectorXd grad(x.size());
-        double y = _func(x, grad, need_g, _data);
-        g = direction.dot(grad);  // g is invalid if need_g == false
-        return y;
-    };
+    // Basically translated from minimize.m of gpml toolbox
     const size_t init_eval = _eval_counter;
-    double prev_alpha = 0;
-    double line_g = 0;
-    double a1 = 0;    // lower bound
-    double a2 = INF;  // upper bound
-    alpha = trial;
-    y = line_func(alpha, line_g, false);
-    if (y >= _current_y)
+    const double interpo   = 0.1;
+    const double extrapo   = 3;
+    const double sig       = 0.1;
+    const double rho       = sig / 2;
+    const double d0        = _current_g.dot(direction);
+    const double f0        = _current_y;
+    double x2, f2, d2; VectorXd df2(_dim);
+    double x3, f3, d3; VectorXd df3(_dim);
+    assert(d0 <= 0);
+    // extrapolation
+    x3 = trial; f3 = INF; d3 = INF;
+    while(true)
     {
-        while (y > _current_y)
+        x2 = 0;     f2 = f0;  d2 = d0;
+        while(_eval_counter - init_eval < max_search)
         {
-            prev_alpha = alpha;
-            alpha = alpha / 5.1;
-            y = line_func(alpha, line_g, false);
+            f3 = _func(_current_x + x3 * direction, df3, true, _data);
+            d3 = df3.dot(direction);
+            printf("Extrapolation, x3 = %g, f3 = %g\n", x3, f3);
+            if(std::isnan(f3) || std::isnan(d3) || std::isinf(f3) || std::isinf(d3))
+                x3 /= 2;
+            else
+                break;
         }
-        a2 = prev_alpha;
-    }
-    else
-    {
-        double prev_y = y;
-        while (y <= prev_y)
-        {
-            prev_alpha = alpha;
-            alpha = alpha * 2;
-            y = line_func(alpha, line_g, false);
-        }
-        a2 = alpha;
-    }
-    const int remain_search = max_search - (_eval_counter - init_eval);
-
-    // Golden selection
-    const double golden_rate = (sqrt(5) - 1) / 2.0;
-    double y1 = _current_y;
-    double y2 = y;
-    double a3, a4, y3, y4;
-    for (int i = remain_search - 1; i > 0; --i)
-    {
-        const double interv_len = a2 - a1;
-        a3 = a2 - golden_rate * interv_len;
-        a4 = a1 + golden_rate * interv_len;
-        if (a3 == a4)
+        if(d3 > sig * d0 || f3 > f0 + x3 * rho * d0)
             break;
+
+        double x1, f1, d1;
+        x1 = x2; f1 = f2; d1 = d2;
+        x2 = x3; f2 = f3; d2 = d3;
+        const double A = 6*(f1-f2)+3*(d2+d1)*(x2-x1);                 // make cubic extrapolation
+        const double B = 3*(f2-f1)-(2*d1+d2)*(x2-x1);
+        x3 = x1 - d1 * pow(x2 - x1, 2) / (B + sqrt(B * B - A * d1 * (x2 - x1)));  // num. error possible, ok!
+
+        if (std::isnan(x3) || std::isinf(x3) || x3 < 0)  // num prob | wrong sign?
+            x3 = x2 * extrapo;                           // extrapolate maximum amount
+        else if (x3 > x2 * extrapo)                      // new point beyond extrapolation limit?
+            x3 = x2 * extrapo;                           // extrapolate maximum amount
+        else if (x3 < x2 + interpo * (x2 - x1))          // new point too close to previous point?
+            x3 = x2 + interpo * (x2 - x1);
+    }
+
+    // Interpolation
+    double x4 = INF, f4 = -1*INF, d4 = INF;
+    while ((abs(d3) > -1*sig*d0 || f3 > f0 + x3 * rho * d0) && _eval_counter - init_eval < max_search)
+    {
+        if (d3 > 0 || f3 > f0+x3*rho*d0)                         // choose subinterval
+        {
+          x4 = x3; f4 = f3; d4 = d3;                      // move point 3 to point 4
+        }
         else
         {
-            assert(a3 < a4);
-            y3 = line_func(a3, line_g, false);
-            y4 = line_func(a4, line_g, false);
-            if (y3 < y4)
-            {
-                a2 = a4;
-                y2 = y4;
-            }
-            else
-            {
-                a1 = a3;
-                y1 = y3;
-            }
+          x2 = x3; f2 = f3; d2 = d3;                      // move point 3 to point 2
         }
+
+        if (f4 > f0)           
+            x3 = x2 - (0.5 * d2 * pow(x4 - x2, 2)) / (f4 - f2 - d2 * (x4 - x2));  // quadratic interpolation
+        else
+        {
+            const double A  = 6 * (f2 - f4) / (x4 - x2) + 3 * (d4 + d2);  // cubic interpolation
+            const double B  = 3 * (f4 - f2) - (2 * d2 + d4) * (x4 - x2);
+            x3 = x2 + (sqrt(B * B - A * d2 * pow(x4 - x2, 2)) - B) / A;  // num. error possible, ok!
+        }
+        if (isnan(x3) || isinf(x3))
+            x3 = (x2+x4)/2;               // if we had a numerical problem then bisect
+        x3 = max(min(x3, x4-interpo*(x4-x2)),x2+interpo*(x4-x2));  // don't accept too close
+        f3 = _func(_current_x + x3 * direction, df3, true, _data);
+        printf("Interpolation, x3 = %g, f3 = %g\n", x3, f3);
+        d3 = df3.dot(direction);
     }
-    if (y3 < y4)
-    {
-        alpha = a3;
-        y     = y3;
-    }
-    else
-    {
-        alpha = a4;
-        y     = y4;
-    }
-    assert(y < _current_y);
+
+    if(! (abs(d3) < -sig*d0 && f3 < f0+x3*rho*d0))
+        cerr << "Wolfe condition violated" << endl;
+
+    // TODO: 可以在此处更新 _current_x, _current_y, _current_g
+    alpha = x3;
+    x     = _current_x + alpha * direction;
+    g     = df3;
+    y     = f3;
 }
 void CG::_init() 
 { 
@@ -289,29 +291,32 @@ double CG::_beta_PR() const noexcept
 MyOpt::Result CG::_one_iter() 
 {
     const size_t inner_iter = _iter_counter % _dim;
-    static double trial     = 1.0 / log2(1 + _current_g.norm());
-    cout << "Iter: " << _iter_counter << endl;
-    cout << "Eval: " << _eval_counter << endl;
-    cout << "Inner iter: " << inner_iter << endl;
-    cout << "Y = " << _current_y << endl;
-    cout << "G.norm = " << _current_g.norm() << endl;
+    static double trial     = 1.0 / (1 + _current_g.norm());
     VectorXd direction(_dim);
     if(inner_iter == 0)
         direction = -1 * _current_g;
     else
     {
         // double beta = _beta_FR();
-        double beta = _beta_FR();
+        double beta = _beta_PR();
         direction = -1 * _current_g + beta * _former_direction;
     }
-    double alpha = 0;
-    double y     = 0;
-    _line_search_exact(direction, alpha, y, 40, trial);
-    cout << "Alpha: " << alpha << endl;
+    double alpha       = 0;
+    double y           = 0;
+    VectorXd x(_dim);
+    VectorXd g(_dim);
+    _line_search_inexact(direction, alpha, x, g, y, 40, trial);
     _former_g         = _current_g;
     _former_direction = direction;
-    _current_x        = _current_x + alpha * direction;
-    _current_y        = _func(_current_x, _current_g, true, _data);
+    _current_x        = x;
+    _current_g        = g;
+    _current_y        = y;
+    printf("Iter = %zu, Eval = %zu, InnerIter = %zu, Y = %g, G.norm = %g, trial = %g, alpha = %g\n", _iter_counter, _eval_counter, inner_iter, _current_y, _current_g.norm(), trial, alpha);
+    const double ratio = 10;
+    if(inner_iter != 0)
+        trial = alpha * min(ratio, direction.dot(_current_g) / _former_direction.dot(_former_g));
+    else
+        trial = alpha;
     cout << "=======================" << endl;
     return MyOpt::SUCCESS;
 }

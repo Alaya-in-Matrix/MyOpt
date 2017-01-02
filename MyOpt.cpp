@@ -278,6 +278,14 @@ void CG::_init()
     _former_g         = VectorXd(_dim);
     _former_direction = VectorXd(_dim);
 }
+double CG::_beta_FR() const noexcept
+{
+    return _current_g.squaredNorm() / _former_g.squaredNorm();
+};
+double CG::_beta_PR() const noexcept
+{
+    return std::max(0.0, _current_g.dot(_current_g - _former_g) / _former_g.squaredNorm());
+};
 MyOpt::Result CG::_one_iter() 
 {
     const size_t inner_iter = _iter_counter % _dim;
@@ -291,7 +299,11 @@ MyOpt::Result CG::_one_iter()
     if(inner_iter == 0)
         direction = -1 * _current_g;
     else
-        direction = -1 * _current_g + _current_g.squaredNorm() / _former_g.squaredNorm() * _former_direction;
+    {
+        // double beta = _beta_FR();
+        double beta = _beta_FR();
+        direction = -1 * _current_g + beta * _former_direction;
+    }
     double alpha = 0;
     double y     = 0;
     _line_search_exact(direction, alpha, y, 40, trial);

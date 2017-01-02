@@ -6,7 +6,7 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE debug)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g")
 endif()
-message(STATUS "Build type is ${CMAKE_BUILD_TYPE}")
+message(STATUS "Build type for MyOpt is ${CMAKE_BUILD_TYPE}")
 
 if(NOT EIGEN_INC_DIR)
     include_directories(~/.softwares/linear_algebra/eigen3.3/include/eigen3/)

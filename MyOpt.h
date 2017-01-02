@@ -116,6 +116,8 @@ class CG : public Solver
     Eigen::VectorXd _former_g;
     Eigen::VectorXd _former_direction;
     MyOpt::Result _one_iter();
+    double _beta_FR() const noexcept; // FLETCHER-REEVES update
+    double _beta_PR() const noexcept; // POLAK-RIBIERE update
 public:
     using Solver::Solver;
 };

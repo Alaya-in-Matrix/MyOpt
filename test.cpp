@@ -26,16 +26,16 @@ double tb_square(const VectorXd& v, VectorXd& grad, bool need_g, void*)
 int main()
 {
     printf("SEED is %zu\n", rand_seed);
-    MyOpt opt(MyOpt::CG, 2);
+    MyOpt opt(MyOpt::RProp, 2);
     opt.set_min_objective(tb_square, nullptr);
     cout << "Algorithm: " << opt.get_algorithm_name() << endl;
     cout << "Dimension: " << opt.get_dimension() << endl;
     VectorXd x(opt.get_dimension());
     x << distr(engine), distr(engine);
     double y(std::numeric_limits<double>::infinity());
-    opt.set_max_iter(5);
-    opt.set_max_eval(200);
-    opt.set_history(1);
+    opt.set_max_iter(2000);
+    opt.set_max_eval(2000);
+    opt.set_history(100);
     opt.set_xtol_rel(1e-3);
     opt.set_gtol(1e-3);
     opt.set_ftol_rel(1e-3);

@@ -134,6 +134,14 @@ public:
 class RProp : public Solver
 {
     // Some params, need further reading
+    // TODO: Allow user set these parameters
+    const double _delta0    = 0.1;
+    const double _delta_min = 1e-6;
+    const double _delta_max = 50;
+    const double _eta_minus = 0.5;
+    const double _eta_plus  = 1.2;
+    Eigen::VectorXd _delta;
+    Eigen::VectorXd _grad_old;
     void _init();
     MyOpt::Result _one_iter();
 public:

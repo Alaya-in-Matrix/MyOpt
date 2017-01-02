@@ -322,5 +322,38 @@ MyOpt::Result CG::_one_iter()
 }
 void BFGS::_init() { Solver::_init(); }
 MyOpt::Result BFGS::_one_iter() { TODO; }
-void RProp::_init() { TODO; }
-MyOpt::Result RProp::_one_iter() { TODO; }
+void RProp::_init() 
+{ 
+    Solver::_init(); 
+    _delta    = VectorXd::Constant(_dim, 1, _delta0);
+    _grad_old = VectorXd::Ones(_dim, 1);
+}
+MyOpt::Result RProp::_one_iter() 
+{ 
+    auto df = _current_g;
+    for(size_t i = 0; i < _dim; ++i)
+    {
+        const double changed = _current_g(i) * _grad_old(i);
+        if(changed > 0)
+        {
+            _delta(i) = min(_delta(i) * _eta_plus, _delta_max);
+        }
+        else if(changed < 0)
+        {
+            _delta(i) = max(_delta(i) * _eta_minus, _delta_min);
+            df(i)     = 0;
+        }
+    }
+    VectorXd deltax(_dim);
+    for(size_t i = 0; i < _dim; ++i)
+    {
+        int sign = df(i) > 0 ? 1 : 0;
+        deltax(i) = _delta(i) * sign;
+    }
+    _grad_old = _current_g;
+
+    cout << "deltax: " << deltax.transpose() << endl;
+    _current_x = _current_x + deltax;
+    _current_y = _func(_current_x, _current_g, true, _data);
+    printf("Iter = %zu, Eval = %zu, Y = %g, G.norm = %g\n", _iter_counter, _eval_counter, _current_y, _current_g.norm());
+}

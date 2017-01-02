@@ -306,17 +306,17 @@ MyOpt::Result CG::_one_iter()
     VectorXd x(_dim);
     VectorXd g(_dim);
     _line_search_inexact(direction, alpha, x, g, y, 40, trial);
-    _former_g         = _current_g;
-    _former_direction = direction;
-    _current_x        = x;
-    _current_g        = g;
-    _current_y        = y;
-    printf("Iter = %zu, Eval = %zu, InnerIter = %zu, Y = %g, G.norm = %g, trial = %g, alpha = %g\n", _iter_counter, _eval_counter, inner_iter, _current_y, _current_g.norm(), trial, alpha);
     const double ratio = 10;
     if(inner_iter != 0)
         trial = alpha * min(ratio, direction.dot(_current_g) / _former_direction.dot(_former_g));
     else
         trial = alpha;
+    _former_g         = _current_g;
+    _former_direction = direction;
+    _current_x        = x;
+    _current_g        = g;
+    _current_y        = y;
+    printf("Iter = %zu, Eval = %zu, InnerIter = %zu, Y = %g, G.norm = %g, alpha = %g, new trial = %g\n", _iter_counter, _eval_counter, inner_iter, _current_y, _current_g.norm(), alpha, trial);
     cout << "=======================" << endl;
     return MyOpt::SUCCESS;
 }

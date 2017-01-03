@@ -102,7 +102,8 @@ std::string MyOpt::explain_result(Result r) const noexcept
 }
 size_t MyOpt::get_dimension() const noexcept { return _dim; }
 Solver::Solver(ObjFunc f, size_t dim, StopCond sc, void* d)
-    : _eval_counter(0),
+    : _func(f),
+      _eval_counter(0),
       _iter_counter(0),
       _dim(dim),
       _cond(sc),
@@ -111,16 +112,28 @@ Solver::Solver(ObjFunc f, size_t dim, StopCond sc, void* d)
       _history_y(queue<double>()),
       _result(MyOpt::SUCCESS)
 {
-    _func = [&](const VectorXd& x, VectorXd& grad, bool need_g, void* d) -> double {
-        double val = f(x, grad, need_g, d);
-        if (val < _besty)
-        {
-            _bestx = x;
-            _besty = val;
-        }
-        ++_eval_counter;
-        return val;
-    };
+    // _func = [&](const VectorXd& x, VectorXd& grad, bool need_g, void* d) -> double {
+    //     double val = f(x, grad, need_g, d);
+    //     if (val < _besty)
+    //     {
+    //         _bestx = x;
+    //         _besty = val;
+    //     }
+    //     ++_eval_counter;
+    //     return val;
+    // };
+}
+double Solver::_run_func(const VectorXd& x, VectorXd& g, bool need_g)
+{
+    const double val = _func(x, g, need_g, _data);
+    // automatically record best evaluation and update _eval_counter
+    ++_eval_counter;
+    if (val < _besty)
+    {
+        _bestx = x; 
+        _besty = val;
+    }
+    return val;
 }
 Solver::~Solver() {}
 void Solver::_init()
@@ -143,7 +156,7 @@ MyOpt::Result Solver::minimize(VectorXd& x0, double& y)
     _init();
     _current_x = x0;
     _current_g = VectorXd::Constant(_dim, 1, INF);
-    _current_y = _func(_current_x, _current_g, true, _data);
+    _current_y = _run_func(_current_x, _current_g, true);
     printf("Initial y = %g, G.norm = %g\n\n", _current_y, _current_g.norm());
 
     while (!_limit_reached())
@@ -210,7 +223,7 @@ void Solver::_line_search_inexact(const Eigen::VectorXd& direction, double& alph
         x2 = 0;     f2 = f0;  d2 = d0;
         while(_eval_counter - init_eval < max_search)
         {
-            f3 = _func(_current_x + x3 * direction, df3, true, _data);
+            f3 = _run_func(_current_x + x3 * direction, df3, true);
             d3 = df3.dot(direction);
             printf("Extrapolation, x3 = %g, f3 = %g\n", x3, f3);
             if(std::isnan(f3) || std::isnan(d3) || std::isinf(f3) || std::isinf(d3))
@@ -260,7 +273,7 @@ void Solver::_line_search_inexact(const Eigen::VectorXd& direction, double& alph
         if (isnan(x3) || isinf(x3))
             x3 = (x2+x4)/2;               // if we had a numerical problem then bisect
         x3 = max(min(x3, x4-interpo*(x4-x2)),x2+interpo*(x4-x2));  // don't accept too close
-        f3 = _func(_current_x + x3 * direction, df3, true, _data);
+        f3 = _run_func(_current_x + x3 * direction, df3, true);
         printf("Interpolation, x3 = %g, f3 = %g\n", x3, f3);
         d3 = df3.dot(direction);
     }
@@ -350,23 +363,16 @@ MyOpt::Result RProp::_one_iter()
         {
             const double changed = _current_g(i) * _grad_old(i);
             if(changed > 0)
-            {
                 _delta(i) = min(_delta(i) * _eta_plus, _delta_max);
-            }
             else if(changed < 0)
-            {
                 _delta(i) = max(_delta(i) * _eta_minus, _delta_min);
-            }
 
-            int sign = 0;
-            if(_current_g(i) > 0)
-                sign = 1;
-            else if(_current_g(i) < 0)
-                sign = -1;
+            int sign = _current_g(i) == 0 ? 0 : (_current_g(i) > 0 ? 1 : -1);
             _current_x(i) -= sign * _delta(i);
         }
-        _grad_old = _current_g;
-        _current_y = _func(_current_x, _current_g, true, _data);
+        _grad_old  = _current_g;
+        _current_y = _run_func(_current_x, _current_g, true);
     }
     printf("Iter = %zu, Eval = %zu, Y = %g, G.norm = %g, delta.norm = %g\n", _iter_counter, _eval_counter, _current_y, _current_g.norm(), _delta.norm());
+    return MyOpt::SUCCESS;
 }

@@ -79,6 +79,8 @@ public:
     virtual void set_param(const std::map<std::string, double>& param);
     virtual ~Solver();
     virtual MyOpt::Result minimize(Eigen::VectorXd& x0, double& y);
+private:
+    ObjFunc _func;
 
 protected:
     size_t _eval_counter;
@@ -91,7 +93,6 @@ protected:
     std::queue<double>          _history_y;
     MyOpt::Result   _result;
 
-    ObjFunc         _func;
     std::map<std::string, double> _params;
     Eigen::VectorXd _bestx;
     double _besty;
@@ -101,11 +102,12 @@ protected:
     Eigen::VectorXd _current_g;
     double _current_y;
 
-    virtual void _init(); // clear counter, best_x, best_y, set params
+    virtual void _init();  // clear counter, best_x, best_y, set params
     virtual void _update_hist();
     virtual void _line_search_inexact(const Eigen::VectorXd& direction, double& alpha, Eigen::VectorXd& x,
                                       Eigen::VectorXd& g, double& y, size_t max_search, double trial);
-    virtual bool _limit_reached(); // return SUCCESS if not to stop
+    virtual bool _limit_reached();  // return SUCCESS if not to stop
+    virtual double _run_func(const Eigen::VectorXd& xs, Eigen::VectorXd& g, bool need_g);
     virtual MyOpt::Result _one_iter() = 0;
 };
 

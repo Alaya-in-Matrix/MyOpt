@@ -330,30 +330,43 @@ void RProp::_init()
 }
 MyOpt::Result RProp::_one_iter() 
 { 
-    auto df = _current_g;
-    for(size_t i = 0; i < _dim; ++i)
+    if(_iter_counter == 0)
     {
-        const double changed = _current_g(i) * _grad_old(i);
-        if(changed > 0)
-        {
-            _delta(i) = min(_delta(i) * _eta_plus, _delta_max);
-        }
-        else if(changed < 0)
-        {
-            _delta(i) = max(_delta(i) * _eta_minus, _delta_min);
-            df(i)     = 0;
-        }
+        double trial = 1.0 / (1.0 + _current_g.norm());
+        double alpha = trial;
+        VectorXd x(_dim);
+        VectorXd g(_dim);
+        double   y;
+        _line_search_inexact(-1 * _current_g, alpha, x, g, y, 40, trial);
+        _grad_old  = _current_g;
+        _current_x = x;
+        _current_g = g;
+        _current_y = y;
+        _delta     = VectorXd::Constant(_dim, 1, alpha);
     }
-    VectorXd deltax(_dim);
-    for(size_t i = 0; i < _dim; ++i)
+    else
     {
-        int sign = df(i) > 0 ? 1 : 0;
-        deltax(i) = _delta(i) * sign;
-    }
-    _grad_old = _current_g;
+        for(size_t i = 0; i < _dim; ++i)
+        {
+            const double changed = _current_g(i) * _grad_old(i);
+            if(changed > 0)
+            {
+                _delta(i) = min(_delta(i) * _eta_plus, _delta_max);
+            }
+            else if(changed < 0)
+            {
+                _delta(i) = max(_delta(i) * _eta_minus, _delta_min);
+            }
 
-    cout << "deltax: " << deltax.transpose() << endl;
-    _current_x = _current_x + deltax;
-    _current_y = _func(_current_x, _current_g, true, _data);
-    printf("Iter = %zu, Eval = %zu, Y = %g, G.norm = %g\n", _iter_counter, _eval_counter, _current_y, _current_g.norm());
+            int sign = 0;
+            if(_current_g(i) > 0)
+                sign = 1;
+            else if(_current_g(i) < 0)
+                sign = -1;
+            _current_x(i) -= sign * _delta(i);
+        }
+        _grad_old = _current_g;
+        _current_y = _func(_current_x, _current_g, true, _data);
+    }
+    printf("Iter = %zu, Eval = %zu, Y = %g, G.norm = %g, delta.norm = %g\n", _iter_counter, _eval_counter, _current_y, _current_g.norm(), _delta.norm());
 }

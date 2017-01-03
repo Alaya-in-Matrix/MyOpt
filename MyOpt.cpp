@@ -1,6 +1,7 @@
 #include "MyOpt.h"
 #include <cassert>
 #include <iostream>
+#include <fstream>
 #include <cstdio>
 #include "def.h"
 using namespace std;
@@ -343,36 +344,33 @@ void RProp::_init()
 }
 MyOpt::Result RProp::_one_iter() 
 { 
-    if(_iter_counter == 0)
+    VectorXd sign(_dim);
+    for(size_t i = 0; i < _dim; ++i)
     {
-        double trial = 1.0 / (1.0 + _current_g.norm());
-        double alpha = trial;
-        VectorXd x(_dim);
-        VectorXd g(_dim);
-        double   y;
-        _line_search_inexact(-1 * _current_g, alpha, x, g, y, 40, trial);
-        _grad_old  = _current_g;
-        _current_x = x;
-        _current_g = g;
-        _current_y = y;
-        _delta     = VectorXd::Constant(_dim, 1, alpha);
+        sign(i) = _current_g(i) == 0 ? 0 : (_current_g(i) > 0 ? 1 : -1);
+        const double changed = _current_g(i) * _grad_old(i);
+        if(changed > 0)
+            _delta(i) = min(_delta(i) * _eta_plus, _delta_max);
+        else if(changed < 0)
+            _delta(i) = max(_delta(i) * _eta_minus, _delta_min);
     }
-    else
-    {
-        for(size_t i = 0; i < _dim; ++i)
-        {
-            const double changed = _current_g(i) * _grad_old(i);
-            if(changed > 0)
-                _delta(i) = min(_delta(i) * _eta_plus, _delta_max);
-            else if(changed < 0)
-                _delta(i) = max(_delta(i) * _eta_minus, _delta_min);
+    VectorXd this_delta = -1*sign.cwiseProduct(_delta);
 
-            int sign = _current_g(i) == 0 ? 0 : (_current_g(i) > 0 ? 1 : -1);
-            _current_x(i) -= sign * _delta(i);
-        }
-        _grad_old  = _current_g;
+    _grad_old      = _current_g;
+    VectorXd x_old = _current_x;
+    _current_x += this_delta;
+    _current_y = _run_func(_current_x, _current_g, true);
+
+    // Recover from inf or NaN
+    while (std::isinf(_current_y) || std::isnan(_current_y) || std::isinf(_current_g.squaredNorm()) ||
+           std::isnan(_current_g.squaredNorm()))
+    {
+        this_delta = 0.618 * this_delta;
+        _current_x = x_old + this_delta;
         _current_y = _run_func(_current_x, _current_g, true);
+        cout << "Recover, y = " << _current_y << endl;
     }
-    printf("Iter = %zu, Eval = %zu, Y = %g, G.norm = %g, delta.norm = %g\n", _iter_counter, _eval_counter, _current_y, _current_g.norm(), _delta.norm());
+    printf("Iter = %zu, Eval = %zu, Y = %g, G.norm = %g, delta.norm = %g\n", _iter_counter, _eval_counter, _current_y,
+           _current_g.norm(), this_delta.norm());
     return MyOpt::SUCCESS;
 }

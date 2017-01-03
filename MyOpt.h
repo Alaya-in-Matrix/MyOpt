@@ -126,7 +126,7 @@ public:
 
 class BFGS : public Solver
 {
-    double c1, c2;  // param to control line search
+    Eigen::MatrixXd _invB;
     void _init();
     MyOpt::Result _one_iter();
 public:

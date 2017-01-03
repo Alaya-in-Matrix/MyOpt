@@ -334,8 +334,31 @@ MyOpt::Result CG::_one_iter()
     cout << "=======================" << endl;
     return MyOpt::SUCCESS;
 }
-void BFGS::_init() { Solver::_init(); }
-MyOpt::Result BFGS::_one_iter() { TODO; }
+void BFGS::_init() 
+{ 
+    Solver::_init(); 
+    _invB = MatrixXd::Identity(_dim, _dim);
+}
+MyOpt::Result BFGS::_one_iter() 
+{ 
+    static double trial     = 1.0 / (1 + _current_g.norm());
+    VectorXd direction = -1 * _invB * _current_g;
+    double alpha, y;
+    VectorXd x(_dim);
+    VectorXd g(_dim);
+    _line_search_inexact(direction, alpha, x, g, y, 20, trial); // always use 1.0 as trial
+    trial = alpha;
+    VectorXd sk = alpha * direction;
+    VectorXd yk = g - _current_g;
+    _invB = _invB + ((sk.dot(yk) + yk.transpose() * _invB * yk) * (sk * sk.transpose())) / pow(sk.dot(yk), 2)
+                  - (_invB * yk * sk.transpose() + sk * yk.transpose() * _invB) / sk.dot(yk);
+    _current_x = x;
+    _current_g = g;
+    _current_y = y;
+    printf("Iter = %zu, Eval = %zu, Y = %g, G.norm = %g, alpha = %g\n", _iter_counter, _eval_counter, _current_y,
+           _current_g.norm(), alpha);
+    return MyOpt::SUCCESS;
+}
 void RProp::_init() 
 { 
     Solver::_init(); 
@@ -372,5 +395,6 @@ MyOpt::Result RProp::_one_iter()
     }
     printf("Iter = %zu, Eval = %zu, Y = %g, G.norm = %g, delta.norm = %g\n", _iter_counter, _eval_counter, _current_y,
            _current_g.norm(), this_delta.norm());
+    cout << "=======================" << endl;
     return MyOpt::SUCCESS;
 }

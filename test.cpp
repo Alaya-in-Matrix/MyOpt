@@ -26,7 +26,7 @@ double tb_square(const VectorXd& v, VectorXd& grad, bool need_g, void*)
 int main()
 {
     printf("SEED is %zu\n", rand_seed);
-    MyOpt opt(MyOpt::RProp, 2);
+    MyOpt opt(MyOpt::BFGS, 2);
     opt.set_min_objective(tb_square, nullptr);
     cout << "Algorithm: " << opt.get_algorithm_name() << endl;
     cout << "Dimension: " << opt.get_dimension() << endl;

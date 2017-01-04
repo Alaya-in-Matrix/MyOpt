@@ -383,7 +383,11 @@ MyOpt::Result RProp::_one_iter()
         if(changed > 0)
             _delta(i) = min(_delta(i) * _eta_plus, _delta_max);
         else if(changed < 0)
-            _delta(i) = max(_delta(i) * _eta_minus, _delta_min);
+        {
+            _delta(i)     = max(_delta(i) * _eta_minus, _delta_min);
+            _current_g(i) = 0;
+            sign(i)       = 0;
+        }
     }
     VectorXd this_delta = -1*sign.cwiseProduct(_delta);
 

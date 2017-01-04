@@ -292,6 +292,7 @@ void CG::_init()
     Solver::_init(); 
     _former_g         = VectorXd(_dim);
     _former_direction = VectorXd(_dim);
+    _set_linesearch_factor(0.05, 0.1);
 }
 double CG::_beta_FR() const noexcept
 {
@@ -304,7 +305,7 @@ double CG::_beta_PR() const noexcept
 MyOpt::Result CG::_one_iter() 
 {
     const size_t inner_iter = _iter_counter % _dim;
-    static double trial     = 1.0 / (1 + _current_g.norm());
+    static double trial     = 1.0 / (1 + _current_g.squaredNorm());
     VectorXd direction(_dim);
     if(inner_iter == 0)
         direction = -1 * _current_g;

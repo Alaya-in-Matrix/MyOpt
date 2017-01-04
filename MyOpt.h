@@ -86,12 +86,14 @@ protected:
     size_t _eval_counter;
     size_t _iter_counter;
 
-    size_t          _dim;
-    StopCond        _cond;
-    void*           _data;
+    size_t        _dim;
+    StopCond      _cond;
+    void*         _data;
+    MyOpt::Result _result;
     std::queue<Eigen::VectorXd> _history_x;
     std::queue<double>          _history_y;
-    MyOpt::Result   _result;
+    double _c_decrease;
+    double _c_curvature;
 
     std::map<std::string, double> _params;
     Eigen::VectorXd _bestx;
@@ -104,7 +106,8 @@ protected:
 
     virtual void _init();  // clear counter, best_x, best_y, set params
     virtual void _update_hist();
-    virtual void _line_search_inexact(const Eigen::VectorXd& direction, double& alpha, Eigen::VectorXd& x,
+    virtual void _set_linesearch_factor(double c1, double c2);
+    virtual bool _line_search_inexact(const Eigen::VectorXd& direction, double& alpha, Eigen::VectorXd& x,
                                       Eigen::VectorXd& g, double& y, size_t max_search, double trial);
     virtual bool _limit_reached();  // return SUCCESS if not to stop
     virtual double _run_func(const Eigen::VectorXd& xs, Eigen::VectorXd& g, bool need_g);

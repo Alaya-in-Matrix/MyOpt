@@ -109,21 +109,12 @@ Solver::Solver(ObjFunc f, size_t dim, StopCond sc, void* d)
       _dim(dim),
       _cond(sc),
       _data(d),
+      _result(MyOpt::SUCCESS), 
       _history_x(queue<VectorXd>()),
-      _history_y(queue<double>()),
-      _result(MyOpt::SUCCESS)
-{
-    // _func = [&](const VectorXd& x, VectorXd& grad, bool need_g, void* d) -> double {
-    //     double val = f(x, grad, need_g, d);
-    //     if (val < _besty)
-    //     {
-    //         _bestx = x;
-    //         _besty = val;
-    //     }
-    //     ++_eval_counter;
-    //     return val;
-    // };
-}
+      _history_y(queue<double>()), 
+      _c_decrease(0.01), 
+      _c_curvature(0.9)
+{}
 double Solver::_run_func(const VectorXd& x, VectorXd& g, bool need_g)
 {
     const double val = _func(x, g, need_g, _data);
@@ -203,15 +194,21 @@ bool Solver::_limit_reached()
     }
     return _result != MyOpt::SUCCESS;
 }
-void Solver::_line_search_inexact(const Eigen::VectorXd& direction, double& alpha, Eigen::VectorXd& x,
+void Solver::_set_linesearch_factor(double c1, double c2)
+{
+    assert(0 <= c1 && c1 <= c2 && c2 <= 1.0);
+    _c_decrease  = c1;
+    _c_curvature = c2;
+}
+bool Solver::_line_search_inexact(const Eigen::VectorXd& direction, double& alpha, Eigen::VectorXd& x,
                                   Eigen::VectorXd& g, double& y, size_t max_search, double trial)
 {
     // Basically translated from minimize.m of gpml toolbox
     const size_t init_eval = _eval_counter;
-    const double interpo   = 0.1;
-    const double extrapo   = 3;
-    const double sig       = 0.1;
-    const double rho       = sig / 2;
+    const double interpo   = 0.618;
+    const double extrapo   = 1 / 0.618;
+    const double rho       = _c_decrease; // sufficient decrease
+    const double sig       = _c_curvature;  // curvature
     const double d0        = _current_g.dot(direction);
     const double f0        = _current_y;
     double x2, f2, d2; VectorXd df2(_dim);
@@ -279,14 +276,16 @@ void Solver::_line_search_inexact(const Eigen::VectorXd& direction, double& alph
         d3 = df3.dot(direction);
     }
 
-    if(! (abs(d3) < -sig*d0 && f3 < f0+x3*rho*d0))
-        cerr << "Wolfe condition violated" << endl;
-
-    // TODO: 可以在此处更新 _current_x, _current_y, _current_g
     alpha = x3;
     x     = _current_x + alpha * direction;
     g     = df3;
     y     = f3;
+    if(! (abs(d3) < -sig*d0 && f3 < f0+x3*rho*d0))
+    {
+        cerr << "Wolfe condition violated" << endl;
+        return false;
+    }
+    return true;
 }
 void CG::_init() 
 { 
@@ -337,6 +336,7 @@ MyOpt::Result CG::_one_iter()
 void BFGS::_init() 
 { 
     Solver::_init(); 
+    _set_linesearch_factor(1e-4, 0.9); // suggested by <Numerical Optimization>
     _invB = MatrixXd::Identity(_dim, _dim);
 }
 MyOpt::Result BFGS::_one_iter() 
@@ -346,12 +346,20 @@ MyOpt::Result BFGS::_one_iter()
     double alpha, y;
     VectorXd x(_dim);
     VectorXd g(_dim);
-    _line_search_inexact(direction, alpha, x, g, y, 20, trial); // always use 1.0 as trial
-    trial = alpha;
-    VectorXd sk = alpha * direction;
-    VectorXd yk = g - _current_g;
-    _invB = _invB + ((sk.dot(yk) + yk.transpose() * _invB * yk) * (sk * sk.transpose())) / pow(sk.dot(yk), 2)
-                  - (_invB * yk * sk.transpose() + sk * yk.transpose() * _invB) / sk.dot(yk);
+    bool ls_success = _line_search_inexact(direction, alpha, x, g, y, 50, trial); // always use 1.0 as trial
+    trial = alpha * 1.1;
+    if(ls_success)
+    {
+        VectorXd sk = alpha * direction;
+        VectorXd yk = g - _current_g;
+        _invB = _invB + ((sk.dot(yk) + yk.transpose() * _invB * yk) * (sk * sk.transpose())) / pow(sk.dot(yk), 2)
+            - (_invB * yk * sk.transpose() + sk * yk.transpose() * _invB) / sk.dot(yk);
+    }
+    else
+    {
+        cout << "Restart" << endl;
+        _invB = MatrixXd::Identity(_dim, _dim);
+    }
     _current_x = x;
     _current_g = g;
     _current_y = y;

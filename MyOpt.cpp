@@ -223,7 +223,9 @@ bool Solver::_line_search_inexact(const Eigen::VectorXd& direction, double& alph
         {
             f3 = _run_func(_current_x + x3 * direction, df3, true);
             d3 = df3.dot(direction);
+#ifdef MYDEBUG
             printf("Extrapolation, x3 = %g, f3 = %g\n", x3, f3);
+#endif
             if(std::isnan(f3) || std::isnan(d3) || std::isinf(f3) || std::isinf(d3))
                 x3 /= 2;
             else
@@ -272,7 +274,9 @@ bool Solver::_line_search_inexact(const Eigen::VectorXd& direction, double& alph
             x3 = (x2+x4)/2;               // if we had a numerical problem then bisect
         x3 = max(min(x3, x4-interpo*(x4-x2)),x2+interpo*(x4-x2));  // don't accept too close
         f3 = _run_func(_current_x + x3 * direction, df3, true);
+#ifdef MYDEBUG
         printf("Interpolation, x3 = %g, f3 = %g\n", x3, f3);
+#endif
         d3 = df3.dot(direction);
     }
 
@@ -330,8 +334,10 @@ MyOpt::Result CG::_one_iter()
     _current_x        = x;
     _current_g        = g;
     _current_y        = y;
+#ifdef MYDEBUG
     printf("Iter = %zu, Eval = %zu, InnerIter = %zu, Y = %g, G.norm = %g, alpha = %g, new trial = %g\n", _iter_counter, _eval_counter, inner_iter, _current_y, _current_g.norm(), alpha, trial);
     cout << "=======================" << endl;
+#endif
     return MyOpt::SUCCESS;
 }
 void BFGS::_init() 
@@ -358,14 +364,18 @@ MyOpt::Result BFGS::_one_iter()
     }
     else
     {
+#ifdef MYDEBUG
         cout << "Restart" << endl;
+#endif
         _invB = MatrixXd::Identity(_dim, _dim);
     }
     _current_x = x;
     _current_g = g;
     _current_y = y;
+#ifdef MYDEBUG
     printf("Iter = %zu, Eval = %zu, Y = %g, G.norm = %g, alpha = %g\n", _iter_counter, _eval_counter, _current_y,
            _current_g.norm(), alpha);
+#endif
     return MyOpt::SUCCESS;
 }
 void RProp::_init() 
@@ -404,10 +414,14 @@ MyOpt::Result RProp::_one_iter()
         this_delta = 0.618 * this_delta;
         _current_x = x_old + this_delta;
         _current_y = _run_func(_current_x, _current_g, true);
+#ifdef MYDEBUG
         cout << "Recover, y = " << _current_y << endl;
+#endif
     }
+#ifdef MYDEBUG
     printf("Iter = %zu, Eval = %zu, Y = %g, G.norm = %g, delta.norm = %g\n", _iter_counter, _eval_counter, _current_y,
            _current_g.norm(), this_delta.norm());
     cout << "=======================" << endl;
+#endif
     return MyOpt::SUCCESS;
 }

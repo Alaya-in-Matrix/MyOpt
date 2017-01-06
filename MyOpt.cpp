@@ -104,6 +104,7 @@ std::string MyOpt::explain_result(Result r) const noexcept
 size_t MyOpt::get_dimension() const noexcept { return _dim; }
 Solver::Solver(ObjFunc f, size_t dim, StopCond sc, void* d)
     : _func(f),
+      _line_search_trial(1.0),
       _eval_counter(0),
       _iter_counter(0),
       _dim(dim),
@@ -202,10 +203,13 @@ void Solver::_set_linesearch_factor(double c1, double c2)
     _c_decrease  = c1;
     _c_curvature = c2;
 }
+void Solver::_set_trial(double t) { _line_search_trial = t; }
+double Solver::_get_trial() const noexcept { return _line_search_trial; }
 bool Solver::_line_search_inexact(const Eigen::VectorXd& direction, double& alpha, Eigen::VectorXd& x,
-                                  Eigen::VectorXd& g, double& y, size_t max_search, double trial)
+                                  Eigen::VectorXd& g, double& y, size_t max_search)
 {
     // Basically translated from minimize.m of gpml toolbox
+    const double trial = _get_trial();
     const size_t init_eval = _eval_counter;
     const double interpo   = 0.618;
     const double extrapo   = 1 / 0.618;
@@ -313,7 +317,10 @@ double CG::_beta_PR() const noexcept
 MyOpt::Result CG::_one_iter() 
 {
     const size_t inner_iter = _iter_counter % _dim;
-    static double trial     = 1.0 / (1 + _current_g.squaredNorm());
+    double trial     = 1.0 / (1 + _current_g.squaredNorm());
+    if(_iter_counter == 0)
+        _set_trial(trial);
+
     VectorXd direction(_dim);
     if(inner_iter == 0)
         direction = -1 * _current_g;
@@ -327,12 +334,13 @@ MyOpt::Result CG::_one_iter()
     double y           = 0;
     VectorXd x(_dim);
     VectorXd g(_dim);
-    _line_search_inexact(direction, alpha, x, g, y, 40, trial);
+    _line_search_inexact(direction, alpha, x, g, y, 20);
     const double ratio = 10;
     if(inner_iter != 0)
         trial = alpha * min(ratio, direction.dot(_current_g) / _former_direction.dot(_former_g));
     else
         trial = alpha;
+    _set_trial(trial);
     _former_g         = _current_g;
     _former_direction = direction;
     _current_x        = x;
@@ -352,13 +360,16 @@ void BFGS::_init()
 }
 MyOpt::Result BFGS::_one_iter() 
 { 
-    static double trial     = 1.0 / (1 + _current_g.norm());
+    double trial     = 1.0 / (1 + _current_g.norm());
+    if(_iter_counter == 0)
+        _set_trial(trial);
     VectorXd direction = -1 * _invB * _current_g;
     double alpha, y;
     VectorXd x(_dim);
     VectorXd g(_dim);
-    bool ls_success = _line_search_inexact(direction, alpha, x, g, y, 50, trial); // always use 1.0 as trial
+    bool ls_success = _line_search_inexact(direction, alpha, x, g, y, 20); // always use 1.0 as trial
     trial = alpha * 1.1;
+    _set_trial(trial);
     if(ls_success)
     {
         VectorXd sk = alpha * direction;

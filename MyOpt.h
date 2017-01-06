@@ -81,6 +81,7 @@ public:
     virtual MyOpt::Result minimize(Eigen::VectorXd& x0, double& y);
 private:
     ObjFunc _func;
+    double  _line_search_trial;
 
 protected:
     size_t _eval_counter;
@@ -108,10 +109,12 @@ protected:
     virtual void _update_hist();
     virtual void _set_linesearch_factor(double c1, double c2);
     virtual bool _line_search_inexact(const Eigen::VectorXd& direction, double& alpha, Eigen::VectorXd& x,
-                                      Eigen::VectorXd& g, double& y, size_t max_search, double trial);
+                                      Eigen::VectorXd& g, double& y, size_t max_search);
     virtual bool _limit_reached();  // return SUCCESS if not to stop
     virtual double _run_func(const Eigen::VectorXd& xs, Eigen::VectorXd& g, bool need_g);
     virtual MyOpt::Result _one_iter() = 0;
+    virtual void _set_trial(double);
+    virtual double _get_trial() const noexcept;
 };
 
 class CG : public Solver

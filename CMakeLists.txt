@@ -44,13 +44,13 @@ endif()
 if(CMAKE_INSTALL_PREFIX)
     message(STATUS "Cmake install prefix for MyOpt: ${CMAKE_INSTALL_PREFIX}")
     install(TARGETS ${LIB} ${EXE}
-            RUNTIME DESTINATION bin
-            ARCHIVE DESTINATION lib
-            LIBRARY DESTINATION lib)
-    install(FILES MyOpt.h
-            DESTINATION inc
-            PERMISSIONS OWNER_READ GROUP_READ)
+        RUNTIME DESTINATION MyOpt/bin
+        ARCHIVE DESTINATION MyOpt/lib
+        LIBRARY DESTINATION MyOpt/lib)
+    install(FILES MyOpt.h def.h
+        DESTINATION MyOpt/inc
+        PERMISSIONS OWNER_READ GROUP_READ)
     install(FILES README.md
-            DESTINATION doc
-            PERMISSIONS OWNER_READ GROUP_READ)
+        DESTINATION MyOpt/doc
+        PERMISSIONS OWNER_READ GROUP_READ)
 endif()

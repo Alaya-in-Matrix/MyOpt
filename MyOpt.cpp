@@ -219,6 +219,14 @@ bool Solver::_line_search_inexact(const Eigen::VectorXd& direction, double& alph
     const double f0        = _current_y;
     double x2, f2, d2; VectorXd df2(_dim);
     double x3, f3, d3; VectorXd df3(_dim);
+    if(d0 > 0 || std::isinf(d0) || std::isnan(d0))
+    {
+        alpha = 0;
+        x     = _current_x;
+        g     = _current_g;
+        y     = _current_y;
+        return false;
+    }
     assert(d0 <= 0);
     // extrapolation
     x3 = trial; f3 = INF; d3 = INF;
@@ -423,12 +431,19 @@ MyOpt::Result RProp::_one_iter()
     _current_y = _run_func(_current_x, _current_g, true);
 
     // Recover from inf or NaN
+    const size_t max_retry = 20;
+    size_t retry = 0;
     while (std::isinf(_current_y) || std::isnan(_current_y) || std::isinf(_current_g.squaredNorm()) ||
            std::isnan(_current_g.squaredNorm()))
     {
         this_delta = 0.618 * this_delta;
         _current_x = x_old + this_delta;
         _current_y = _run_func(_current_x, _current_g, true);
+        ++retry;
+        if(retry >= max_retry)
+        {
+            break;
+        }
 #ifdef MYDEBUG
         cout << "Recover, y = " << _current_y << endl;
 #endif

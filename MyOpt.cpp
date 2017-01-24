@@ -6,14 +6,6 @@
 #include "def.h"
 using namespace std;
 using namespace Eigen;
-#define TODO                                    \
-    {                                           \
-        cerr << "TODO assertion" << endl;       \
-        cerr << "\tFile: " << __FILE__ << endl; \
-        cerr << "\tLine: " << __LINE__ << endl; \
-        cerr << "\tFunc: " << __func__ << endl; \
-        assert(false);                          \
-    }
 MyOpt::MyOpt(MyOpt::Algorithm a, size_t dim)
     : _algo(a), _dim(dim), _cond(_default_stop_cond()), _data(nullptr), _solver(nullptr)
 {
@@ -150,9 +142,6 @@ MyOpt::Result Solver::minimize(VectorXd& x0, double& y)
     _current_x = x0;
     _current_g = VectorXd::Constant(_dim, 1, INF);
     _current_y = _run_func(_current_x, _current_g, true);
-#ifdef MYDEBUG
-    printf("Initial y = %g, G.norm = %g\n\n", _current_y, _current_g.norm());
-#endif
 
     while (!_limit_reached())
     {
@@ -237,9 +226,6 @@ bool Solver::_line_search_inexact(const Eigen::VectorXd& direction, double& alph
         {
             f3 = _run_func(_current_x + x3 * direction, df3, true);
             d3 = df3.dot(direction);
-#ifdef MYDEBUG
-            printf("Extrapolation, x3 = %g, f3 = %g\n", x3, f3);
-#endif
             if(std::isnan(f3) || std::isnan(d3) || std::isinf(f3) || std::isinf(d3))
                 x3 /= 2;
             else
@@ -288,9 +274,6 @@ bool Solver::_line_search_inexact(const Eigen::VectorXd& direction, double& alph
             x3 = (x2+x4)/2;               // if we had a numerical problem then bisect
         x3 = max(min(x3, x4-interpo*(x4-x2)),x2+interpo*(x4-x2));  // don't accept too close
         f3 = _run_func(_current_x + x3 * direction, df3, true);
-#ifdef MYDEBUG
-        printf("Interpolation, x3 = %g, f3 = %g\n", x3, f3);
-#endif
         d3 = df3.dot(direction);
     }
 
@@ -301,7 +284,7 @@ bool Solver::_line_search_inexact(const Eigen::VectorXd& direction, double& alph
     if(! (abs(d3) < -sig*d0 && f3 < f0+x3*rho*d0))
     {
 #ifdef MYDEBUG
-        cerr << "Wolfe condition violated" << endl;
+        cerr << "Linesearch Wolfe condition violated" << endl;
 #endif
         return false;
     }
@@ -354,10 +337,6 @@ MyOpt::Result CG::_one_iter()
     _current_x        = x;
     _current_g        = g;
     _current_y        = y;
-#ifdef MYDEBUG
-    printf("Iter = %zu, Eval = %zu, InnerIter = %zu, Y = %g, G.norm = %g, alpha = %g, new trial = %g\n", _iter_counter, _eval_counter, inner_iter, _current_y, _current_g.norm(), alpha, trial);
-    cout << "=======================" << endl;
-#endif
     return MyOpt::SUCCESS;
 }
 void BFGS::_init() 
@@ -387,18 +366,11 @@ MyOpt::Result BFGS::_one_iter()
     }
     else
     {
-#ifdef MYDEBUG
-        cout << "Restart" << endl;
-#endif
         _invB = MatrixXd::Identity(_dim, _dim);
     }
     _current_x = x;
     _current_g = g;
     _current_y = y;
-#ifdef MYDEBUG
-    printf("Iter = %zu, Eval = %zu, Y = %g, G.norm = %g, alpha = %g\n", _iter_counter, _eval_counter, _current_y,
-           _current_g.norm(), alpha);
-#endif
     return MyOpt::SUCCESS;
 }
 void RProp::_init() 
@@ -445,13 +417,8 @@ MyOpt::Result RProp::_one_iter()
             break;
         }
 #ifdef MYDEBUG
-        cout << "Recover, y = " << _current_y << endl;
+        cerr << "Rprop recover, y = " << _current_y << endl;
 #endif
     }
-#ifdef MYDEBUG
-    printf("Iter = %zu, Eval = %zu, Y = %g, G.norm = %g, delta.norm = %g\n", _iter_counter, _eval_counter, _current_y,
-           _current_g.norm(), this_delta.norm());
-    cout << "=======================" << endl;
-#endif
     return MyOpt::SUCCESS;
 }

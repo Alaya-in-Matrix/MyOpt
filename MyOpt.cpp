@@ -72,7 +72,7 @@ std::string MyOpt::get_algorithm_name() const noexcept
     }
 #undef C
 }
-std::string MyOpt::explain_result(Result r) const noexcept
+std::string MyOpt::explain_result(Result r)
 {
 #define C(A) case A: return #A
     switch(r)

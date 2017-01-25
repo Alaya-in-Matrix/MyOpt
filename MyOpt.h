@@ -57,7 +57,7 @@ public:
     void set_min_objective(ObjFunc, void* data);
     size_t get_dimension() const noexcept;
     std::string get_algorithm_name() const noexcept;
-    std::string explain_result(Result) const noexcept;
+    static std::string explain_result(Result);
 
 private:
     const Algorithm _algo;

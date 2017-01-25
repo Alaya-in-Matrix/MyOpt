@@ -363,14 +363,14 @@ MyOpt::Result BFGS::_one_iter()
         VectorXd yk = g - _current_g;
         _invB = _invB + ((sk.dot(yk) + yk.transpose() * _invB * yk) * (sk * sk.transpose())) / pow(sk.dot(yk), 2)
             - (_invB * yk * sk.transpose() + sk * yk.transpose() * _invB) / sk.dot(yk);
+        _current_x = x;
+        _current_g = g;
+        _current_y = y;
     }
     else
     {
         _invB = MatrixXd::Identity(_dim, _dim);
     }
-    _current_x = x;
-    _current_g = g;
-    _current_y = y;
     return MyOpt::SUCCESS;
 }
 void RProp::_init() 
